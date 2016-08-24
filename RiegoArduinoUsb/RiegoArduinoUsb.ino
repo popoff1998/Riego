@@ -86,53 +86,55 @@
 #include <SPI.h>
 #include <MySensors.h>  
 
-#define RELAY_1  13  // Arduino Digital I/O pin number for first relay (second on pin+1 etc)
-#define NUMBER_OF_RELAYS 1 // Total number of attached relays
+// DEFINES DE RELES
+#define RELE_GOT_BAJO    31
+#define RELE_ASP_PORCHE 33
+#define RELE_TURBINAS    35
+const int pins[] = {13,31,33,35};
+const char *pinsString[] = {"RELE_LED","RELE_GOT_BAJO","RELE_ASP_PORCHE","RELE_TURBINAS"};
+#define RELE_LED  13  // Arduino Digital I/O pin number for first relay (second on pin+1 etc)
+#define NUMBER_OF_RELAYS 4 // Total number of attached relays
 #define RELAY_ON 1  // GPIO value to write to turn on attached relay
 #define RELAY_OFF 0 // GPIO value to write to turn off attached relay
 
 void setup() { 
   // Setup locally attached sensors
     Serial.println("start call Setup");
-  for (int sensor=1, pin=RELAY_1; sensor<=NUMBER_OF_RELAYS;sensor++, pin++) {
-    // Then set relay pins in output mode
+  for (int sensor=0, pin=pins[sensor]; sensor<NUMBER_OF_RELAYS;sensor++) {
+    // Poner el rele en output mode
     pinMode(pin, OUTPUT);   
-    // Set relay to last known state (using eeprom storage) 
+    // Poner el rele en el ultimo estado conocido (usando eeprom storage) 
     digitalWrite(pin, loadState(sensor)?RELAY_ON:RELAY_OFF);
   }
-    Serial.println("Start wait");  
-    //delay(60000);  
-    Serial.println("End wait");  
     Serial.println("End call Setup");
+    //Lamo a presentation hasta que corrija el bug que tiene gatewayserial
     presentation();
 }
 
 void presentation() {
- // Present locally attached sensors 
-     Serial.println("start call presentation");
-    Serial.println("Start wait");  
-    //delay(60000);  
-    Serial.println("End wait");  
-  // Send the sketch version information to the gateway and Controller
-  sendSketchInfo("Relay", "2.0");
+  // Presentar los sensores y actuadores locales 
+  Serial.println("start call presentation");
+  // Mandar la info del sketch
+  sendSketchInfo("Arduino USB", "1.0");
 
-  for (int sensor=1, pin=RELAY_1; sensor<=NUMBER_OF_RELAYS;sensor++, pin++) {
-    // Register all sensors to gw (they will be created as child devices)
-    present(sensor, S_LIGHT);
+  //Presentar los reles
+  for (int rele=0, pin=pins[rele]; rele<NUMBER_OF_RELAYS;rele++) {
+    // Registrar todos los reles al gw
+    present(rele, S_LIGHT,pinsString[rele]);
   }
-
-      Serial.println("End call presentation");
+  Serial.println("End call presentation");
 }
 
 void loop() { 
   // Send locally attached sensor data here 
 }
 
+
 void receive(const MyMessage &message) {
   // We only expect one type of message from controller. But we better check anyway.
   if (message.type==V_LIGHT) {
      // Change relay state
-     digitalWrite(message.sensor-1+RELAY_1, message.getBool()?RELAY_ON:RELAY_OFF);
+     digitalWrite(pins[message.sensor], message.getBool()?RELAY_ON:RELAY_OFF);
      // Store state in eeprom
      saveState(message.sensor, message.getBool());
      // Write some debug info
