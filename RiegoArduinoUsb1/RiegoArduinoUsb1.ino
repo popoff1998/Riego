@@ -88,38 +88,29 @@
 
 //Para el sensor de temperatura
 #ifdef TEMP
-#include <DallasTemperature.h>
-#include <OneWire.h>
-#define ONE_WIRE_BUS 2
-OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature sensors(&oneWire);
-MyMessage msg(0,V_TEMP);
+  #include <DallasTemperature.h>
+  #include <OneWire.h>
+  #define ONE_WIRE_BUS 2
+  OneWire oneWire(ONE_WIRE_BUS);
+  DallasTemperature sensors(&oneWire);
+  MyMessage msg(0,V_TEMP);
 #endif
 
-//Structura de actuadores
+//Structura de reles
 typedef struct  {
-  int pin;
+  int  pin;
   char desc[20];
-  bool relayOn;
-  bool relayOff;
+  bool ON;
+  bool OFF;
 } sRELE;
 
 sRELE Rele [] = { {13 , "LED", HIGH, LOW},
-               {31 , "RELE ASPERSOR PORCHE", LOW, HIGH},
-               {33 , "RELE TURBINAS", LOW, HIGH},
-               {35 , "RELE GOTEROS BAJOS", LOW, HIGH}
-             };
+                  {31 , "RELE ASPERSOR PORCHE", LOW, HIGH},
+                  {33 , "RELE TURBINAS", LOW, HIGH},
+                  {35 , "RELE GOTEROS BAJOS", LOW, HIGH}
+                };
 
-// DEFINES DE RELES
-#define RELE_GOT_BAJO    31
-#define RELE_ASP_PORCHE 33
-#define RELE_TURBINAS    35
-const int pins[] = {13,31,33,35};
-const char *pinsString[] = {"RELE_LED","RELE_GOT_BAJO","RELE_ASP_PORCHE","RELE_TURBINAS"};
-#define RELE_LED  13  // Arduino Digital I/O pin number for first relay (second on pin+1 etc)
 #define NUMBER_OF_RELAYS 4 // Total number of attached relays
-#define RELAY_ON 0  // GPIO value to write to turn on attached relay
-#define RELAY_OFF 1 // GPIO value to write to turn off attached relay
 
 void setup() { 
   // Setup locally attached sensors
@@ -131,14 +122,11 @@ void setup() {
     Serial.println("start call Setup");
   for (int sensor=0 ; sensor<NUMBER_OF_RELAYS;sensor++) {
     // Poner el rele en output mode
-    pinMode(pins[sensor], OUTPUT);   
+    pinMode(Rele[sensor].pin, OUTPUT);   
     // Poner el rele en el ultimo estado conocido (usando eeprom storage) 
-    digitalWrite(pins[sensor], loadState(sensor)?RELAY_ON:RELAY_OFF);
+    digitalWrite(Rele[sensor].pin, loadState(sensor)?Rele[sensor].ON:Rele[sensor].OFF);
   }
     Serial.println("End call Setup");
-    //Llamo a presentation hasta que corrija el bug que tiene gatewayserial
-    //PRUEBA: Pongo el 31 a on
-    //digitalWrite(31,RELAY_ON);
     presentation();
 }
 
@@ -149,9 +137,9 @@ void presentation() {
   sendSketchInfo("Arduino USB", "1.0");
 
   //Presentar los reles
-  for (int rele=0, pin=pins[rele]; rele<NUMBER_OF_RELAYS;rele++) {
+  for (int rele=0; rele<NUMBER_OF_RELAYS;rele++) {
     // Registrar todos los reles al gw
-    present(rele, S_LIGHT,pinsString[rele]);
+    present(rele, S_LIGHT,Rele[rele].desc);
   }
   Serial.println("End call presentation");
 #ifdef TEMP
@@ -163,35 +151,27 @@ bool STATUS;
 void loop() { 
   // Send locally attached sensor data here 
 #ifdef TEMP
-  Serial.print("Requesting temperatures...");
+  Serial.print("Solicitando temperaturas...");
   sensors.requestTemperatures(); // Send the command to get temperatures
   float temperatura = sensors.getTempCByIndex(0);
   send(msg.setSensor(9).set(temperatura,1));
   Serial.println("DONE");
   sleep(2000);
-
-STATUS = !STATUS;
-Serial.println("Paso por aqui");
-//pinMode(31,OUTPUT);
-digitalWrite(31,STATUS);
-Serial.print("El valor es");
-Serial.println(digitalRead(31));
-sleep(1000);
 #endif
 }
 
 
 void receive(const MyMessage &message) {
-  // We only expect one type of message from controller. But we better check anyway.
+  // Solo esperamos mensajes V_LIGTH de momento, pero lo chequeamos por si acaso.
   if (message.type==V_LIGHT) {
-     // Change relay state
-     digitalWrite(pins[message.sensor], message.getBool()?RELAY_ON:RELAY_OFF);
-     // Store state in eeprom
+     // Cambiar estado del rele
+     digitalWrite(Rele[message.sensor].pin, message.getBool()?Rele[message.sensor].ON:Rele[message.sensor].OFF);
+     // Almacenar estado en la eeprom
      saveState(message.sensor, message.getBool());
-     // Write some debug info
-     Serial.print("Incoming change for sensor:");
+     // Escribir informacion de debug
+     Serial.print("Cambio entrante para sensor:");
      Serial.print(message.sensor);
-     Serial.print(", New status: ");
+     Serial.print(", Nuevo status: ");
      Serial.println(message.getBool());
    } 
 }
